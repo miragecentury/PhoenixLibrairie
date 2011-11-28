@@ -95,7 +95,7 @@ abstract class Spesx_Mapper_Mapper
             /* Si l'objet est null (inexistant dans la table de la BDD)
               on l'ajoute */
             try {
-                $this->getDbTable()->insert($data);
+                $return = $this->getDbTable()->insert($data);
             } catch (Zend_Db_Exception $e) {
                 throw new Spesx_Mapper_Exception(
                         'Mapper: Echec Insertion methode save',
@@ -107,6 +107,7 @@ abstract class Spesx_Mapper_Mapper
             try {
                 $where = array($id . ' = ?' => $item->{$method}());
                 $this->getDbTable()->update($data, $where);
+                $return = null;
             } catch (Zend_Db_Exception $e) {
                 throw new Spesx_Mapper_Exception(
                         'Mapper: Echec Update methode save',
@@ -114,6 +115,7 @@ abstract class Spesx_Mapper_Mapper
                         $e);
             }
         }
+        return $return;
     }
 
     //Permet d'initialiser une source de données
