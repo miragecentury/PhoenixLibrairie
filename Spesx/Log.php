@@ -7,6 +7,8 @@
  *      Role : Cette classe entièrement statique assiste l'initialisation du
  *  système de Log d'une Application utilisant Zend_Framework via le passage en
  * paramètre d'un tableau de paramètre.
+ * 
+ * Le suport des tests unitaires a été fait mais les tests sont à écrire.
  *
  *  @author VANROYE Victorien
  *  @copyright Private
@@ -14,8 +16,21 @@
  */
 class Spesx_Log {
 
+    protected static $Zend_Log;
+    protected static $Html_Log;
+    // Isolation
+
     protected static $logConfig;
-    private static $triggerLog;
+
+    // private static $triggerLog; enlever temporairement
+
+    public static function ReturnZendLog() {
+        if (is_a(self::$Zend_Log, 'Zend_Log')) {
+            return self::$Zend_Log;
+        } else {
+            return self::ReturnEmptyLog();
+        }
+    }
 
     /**
      *  Role: Construit l'objet Zend_Log selon les paramètres de configuration
@@ -30,18 +45,21 @@ class Spesx_Log {
      */
     public static function Factory(Array $logConfig, Zend_Log $log = null) {
 
-//$DefautConfig = Spesx_Log::DefautLogConfig;
-//test si les éléments primals ont été défini
-//test si un Zend_Log a été envoyé en paramètre
+        //$DefautConfig = Spesx_Log::DefautLogConfig;
+        //test si les éléments primals ont été défini
+        //test si un Zend_Log a été envoyé en paramètre
         if ($log === null) {
             $log = new Zend_Log();
         }
 
         $nombreWriter = 0;
+        /* initialisation de la variable temporaire de controls du nombre de 
+         * writer, Zend retrounant une erreur si aucun il est important de 
+         * tester le nombre.
+         */
 
         if (
                 isset($logConfig['enable']) &&
-                isset($logConfig['registryLabel']) &&
                 isset($logConfig['timeStampFormat']) &&
                 isset($logConfig['ip']) &&
                 isset($logConfig['ip']['enable']) &&
@@ -53,24 +71,25 @@ class Spesx_Log {
                 isset($logConfig['stream']['enable'])
         ) {
             self::$logConfig = $logConfig;
+            //sauvegarde de la configuration.
         } else {
             throw new Spesx_Log_Exception('Spesx_Log::Factory : Echec de chargement de la configuration');
-            return self::ReturnEmptyLog($logConfig);
+            return self::ReturnEmptyLog();
         }
 
-//Si les logs sont activés Initialisation;
+        //Si les logs sont activés Initialisation;
         if ($logConfig['enable'] == TRUE) {
 
 
-//test sur le timestamp si vide à voir si on peut test la validité
+            //test sur le timestamp si vide à voir si on peut test la validité
             if (empty($logConfig['timeStampFormat'])) {
                 throw new Spesx_Log_Exception('Spesx_Log::Factory : Paramètre log.timeStampFormat Incorrecte ou Vide');
-                return self::ReturnEmptyLog($logConfig);
+                return self::ReturnEmptyLog();
             } else {
                 $log->setTimestampFormat($logConfig['timeStampFormat']);
             }
 
-//Définit l'item Ip si activé
+            //Définit l'item Ip si activé
 
             if ($logConfig['ip']['enable'] == TRUE) {
                 if (self::TestIp($_SERVER['REMOTE_ADDR'])) {
@@ -79,6 +98,7 @@ class Spesx_Log {
                     $logConfig['ip']['enable'] = 'off';
                 }
             }
+
             if (
                     isset($logConfig['priority']) &&
                     preg_match("#[0-7]{1}#", $logConfig['priority'])
@@ -89,14 +109,14 @@ class Spesx_Log {
                     $log->addFilter($filter);
                 } catch (Zend_Exception $e) {
                     throw new Spesx_Log_Exception('Spesx_Log::Factory : Impossible d\'initialiser le filtre principale', 0, $e);
-                    return self::ReturnEmptyLog($logConfig);
+                    return self::ReturnEmptyLog();
                 } catch (Exception $e) {
                     throw new Spesx_Log_Exception('Spesx_Log::Factory : Impossible d\'initialiser le filtre principale', 0, $e);
-                    return self::ReturnEmptyLog($logConfig);
+                    return self::ReturnEmptyLog();
                 }
             } else {
                 throw new Spesx_Log_Exception('Spesx_Log::Factory : Paramètre log.priority Incorrecte ou Vide', 0, $e);
-                return self::ReturnEmptyLog($logConfig);
+                return self::ReturnEmptyLog();
             }
 
             if (
@@ -125,26 +145,16 @@ class Spesx_Log {
                 //$nombreWriter++;
             }
 
+            //Permet de retourner un Zend_Log Valide pour Zend
             if ($nombreWriter == 0) {
                 $log->addWriter(new Zend_Log_Writer_Null());
             }
 
-            if (
-                    isset($logConfig['registryLabel']) &&
-                    !empty($logConfig['registryLabel']) &&
-                    is_string($logConfig['registryLabel']) &&
-                    !Zend_Registry::isRegistered($logConfig['registryLabel'])
-            ) {
-                Zend_Registry::set($logConfig['registryLabel'], $log);
-            } else {
-                $log = self::ReturnEmptyLog($logConfig);
-                Zend_Registry::set('Log', $log);
-                throw new Spesx_Log_Exception('Erreur Set Registry');
-            }
+            self::$Zend_Log = $log;
             return $log;
         } else {
 //          Log désactivé
-            return self::ReturnEmptyLog($logConfig);
+            return self::ReturnEmptyLog();
         }
     }
 
@@ -164,9 +174,9 @@ class Spesx_Log {
                 isset($logConfig['stream']['enable']) &&
                 $logConfig['stream']['enable'] == TRUE
         ) {
-
+            
         } else {
-
+            
         }
 
 
@@ -189,7 +199,7 @@ class Spesx_Log {
                 isset($logConfig['db']['enable']) &&
                 $logConfig['db']['enable'] == TRUE
         ) {
-
+            
         }
 
 
@@ -252,7 +262,7 @@ class Spesx_Log {
 
             return $log;
         } else {
-            return self::ReturnEmptyLog($logConfig);
+            return self::ReturnEmptyLog();
         }
     }
 
@@ -288,35 +298,115 @@ class Spesx_Log {
 
     /**
      *
-     * @param array $LogConfig
-     * @param Zend_Log $Log
-     * @return Zend_Log
+     * @param String $msg       Message dans les logs
+     * @param int $priority     Valeur numérique étant 
+     * @return mixed
      */
-    public static function ReloadLog(Array $logConfig, Zend_Log $log = null) {
-//? ip
-        if ($log === null) {
-            $log = new Zend_Log();
+    public static function Log($msg, $priority) {
+        if (
+                $priority === Zend_Log::EMERG ||
+                $priority === Zend_Log::ALERT ||
+                $priority === Zend_Log::CRIT ||
+                $priority === Zend_Log::ERR ||
+                $priority === Zend_Log::WARN ||
+                $priority === Zend_Log::NOTICE ||
+                $priority === Zend_Log::INFO ||
+                $priority === Zend_Log::DEBUG
+        ) {
+            //ok
+        } else {
+            $priority == Zend_Log::DEBUG;
         }
 
-
-
-        return $log;
+        if (is_string($msg)) {
+            //ok
+        } else {
+            $priority = Zend_Log::ERR;
+            $msg = "Erreur de valeur de \$priority dans l'appel de Log ou Log[Level]";
+        }
+        return self::$Zend_Log->log($msg, $priority);
+        //return Zend_Registry::get('Log')->log($msg, $priority);
     }
 
     /**
      *
-     * @param String $msg
-     * @param int $priority
-     * @return mixed
+     * @param type $msg
+     * @return type 
      */
-    public static function Log($msg, $priority) {
-        return Zend_Registry::get('Log')->log($msg, $priority);
+    public static function LogALERT($msg) {
+        return self::$Zend_Log->log($msg, Zend_Log::ALERT);
+    }
+
+    /**
+     *
+     * @param type $msg
+     * @return type 
+     */
+    public static function LogERR($msg) {
+        return self::$Zend_Log->log($msg, Zend_Log::ERR);
+    }
+
+    /**
+     *
+     * @param type $msg
+     * @return type 
+     */
+    public static function LogINFO($msg) {
+        return self::$Zend_Log->log($msg, Zend_Log::INFO);
+    }
+
+    /**
+     *
+     * @param type $msg
+     * @return type 
+     */
+    public static function LogCRIT($msg) {
+        return self::$Zend_Log->log($msg, Zend_Log::CRIT);
+    }
+
+    /**
+     *
+     * @param type $msg
+     * @return type 
+     */
+    public static function LogEMERG($msg) {
+        return self::$Zend_Log->log($msg, Zend_Log::EMERG);
+    }
+
+    /**
+     *
+     * @param type $msg
+     * @return type 
+     */
+    public static function LogNOTICE($msg) {
+        return self::$Zend_Log->log($msg, Zend_Log::NOTICE);
+    }
+
+    /**
+     *
+     * @param type $msg
+     * @return type 
+     */
+    public static function LogWARN($msg) {
+        return self::$Zend_Log->log($msg, Zend_Log::WARN);
+    }
+
+    /**
+     * Fonction retournant un Zend_Log Null Valide (utile dans les tests ou 
+     * en cas d'erreur(s).
+     * @return Zend_Log 
+     */
+    public static function ReturnEmptyLog() {
+        $log = new Zend_Log();
+        $log->addWriter(new Zend_Log_Writer_Null());
+        self::$Zend_Log = $log;
+        return $log;
     }
 
     /* ====================================================================== */
 
     /**
-     *
+     * Fonction de Test des formats d'Ip
      * @param mixed $ip
      * @return Boolean
      */
@@ -333,26 +423,6 @@ class Spesx_Log {
             return self::ReturnEmptyLog(self::$logConfig);
         }
         return $resultat;
-    }
-
-    private static function ReturnEmptyLog(Array $logConfig) {
-        $log = new Zend_Log();
-        $log->addWriter(new Zend_Log_Writer_Null());
-        if (
-                isset($logConfig['registryLabel']) &&
-                !empty($logConfig['registryLabel']) &&
-                is_string($logConfig['registryLabel']) &&
-                !Zend_Registry::isRegistered($logConfig['registryLabel'])
-        ) {
-            Zend_Registry::set($logConfig['registryLabel'], $log);
-        } else {
-            Zend_Registry::set('Log', $log);
-        }
-        return $log;
-    }
-
-    private static function TriggerLog(String $msg, Int $priority) {
-
     }
 
 }
