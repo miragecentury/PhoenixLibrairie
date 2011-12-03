@@ -117,7 +117,7 @@ class Spesx_Acl {
     }
 
     public static function ReturnZendAcl() {
-            self::$Zend_Acl;
+            return self::$Zend_Acl;
     }
 
     private static function IniToAcl($PathToIniAclFile = '../application/configs/acl.ini') {
