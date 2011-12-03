@@ -10,173 +10,116 @@ class Spesx_Acl {
     private static $Zend_Log;
     private static $Zend_Cache;
     private static $Zend_Acl;
+    private static $msg = 'Spesx_Acl: ';
 
-    //Isolation
+//Isolation
 
-    public static function factory(Array $configuration, Zend_Acl $Zend_Acl = null, Zend_Log $Zend_Log = null, Zend_Cache $Zend_Cache =null) {
+    public static function factory(Array $config, Zend_Log $Zend_Log = null, Zend_Cache_Core $Zend_Cache =null, Zend_Acl $Zend_Acl = null) {
         if ($Zend_Log == null) {
             $Zend_Log = Spesx_Log::ReturnEmptyLog();
         }
 
-        if ($Zend_Log == null) {
+        self::$Zend_Log = $Zend_Log;
+
+        if ($Zend_Cache == null) {
             $Zend_Cache = Spesx_Cache::ReturnBlackHoleCache();
         }
-        
-        
-    }
 
-    public static function Old_Init() {
-        $filter_bool = new Zend_Filter_Boolean('all');
-        $validate_file_exists = new Zend_Validate_File_Exists();
-        $validate_file_extension = new Zend_Validate_File_Extension('ini');
+        self::$Zend_Cache = $Zend_Cache;
 
-        try {
-            $config = $this->getOption('acl');
-            $config_cache = $this->getOption('cache');
-        } catch (Exception $e) {
-            Zend_Registry::get('Log');
-            return FALSE;
-        }
+        //var_dump($config);
+        //echo '<br/>';
 
-        if (isset($config['active']) && !empty($config['active'])) {
-            $config['active'] = $filter_bool->filter($config['active']);
-        } else {
-            $config['active'] = FALSE;
-        }
-
-        if (isset($config['active_assertion']) && !empty($config['active_assertion'])) {
-            $config['active_assertion'] = $filter_bool->filter($config['active_assertion']);
-        } else {
-            $config['active_assertion'] = FALSE;
-        }
-        //echo '../application/configs/' . $config['filename'];
-        //var_dump($validate_file_exists->isValid('../application/configs/' . $config['filename']));
-        //if ($config['active'] && $validate_file_exists->isValid('../application/configs/'.$config['filename']) && $validate_file_extension->isValid('../application/configs/'.$config['filename'])) {
-        if ($config['active']) {
-            if (isset($config['cache']['active']) && !empty($config['cache']['active'])) {
-                $config['cache']['active'] = $filter_bool->filter($config['cache']['active']);
-            }
-            if ((Zend_Registry::get('Cache') != FALSE)) {
-                if ($config['cache']['active']) {
-                    $cache = Zend_Registry::get('Cache');
-                    if (!($data = $cache->load($config_cache['idApplication'] . 'Acl')) && FALSE) {
-                        echo 'Acl get in cache';
-                        //var_dump($data);
-                        //$data = Zend_Serializer::unserialize($data);
-                        return $data;
-                    } else {
-                        echo 'Acl set in cache';
-                        $acl = $acl = $this->getAcl('../application/configs/' . $config['filename']);
-                        $Sadap = new Zend_Serializer_Adapter_Amf0();
-                        Zend_Serializer::setDefaultAdapter($Sadap);
-                        $data = Zend_Serializer::serialize($acl);
-
-                        var_dump($data);
-                        try {
-                            $cache->save($config_cache['idApplication'] . 'Acl', $data);
-                        } catch (Exception $e) {
-                            Zend_Registry::get('Log')->log('Bootstrap : _initAcl : Exception : Impossible de Mettre l\'Acl dans le Cache', Zend_Log::ALERT);
-                        }
-                    }
-                    return $acl;
+        if (
+                isset($config['enable']) &&
+                isset($config['cache']['enable'])
+        ) {
+            if ($config['enable'] == TRUE) {
+                self::$Zend_Log->log('Acl Activé', Zend_Log::INFO);
+                if ($config['cache']['enable'] == TRUE) {
+                    self::$Zend_Log->log('Acl-Cache Activé', Zend_Log::INFO);
+                    return self::GetAclByCache($config);
                 } else {
-                    Zend_Registry::set('Acl', ($acl = $this->getAcl('../application/configs/' . $config['filename'])));
-                    return $acl;
+                    self::$Zend_Log->log('Acl-Cache Désactivé', Zend_Log::INFO);
+                    return self::InitialisationAcl($config);
                 }
             } else {
-                Zend_Registry::set('Acl', ($acl = $this->getAcl('../application/configs/' . $config['filename'])));
+                self::$Zend_Log->log('Acl Désactivé', Zend_Log::INFO);
+                return self::ReturnEmptyAcl();
+            }
+        } else {
+            self::$Zend_Log->log('Paramètre de Configuration Incorrecte', Zend_Log::CRIT);
+            throw new Spesx_Acl_Exception('Paramètre de Configuration Incorrecte');
+            return self::ReturnEmptyAcl();
+        }
+    }
+
+    private static function GetAclByCache(Array $config) {
+        if (
+                isset($config['cache']['id']) && !empty($config['cache']['id']) &&
+                isset($config['cache']['lifetime']) && !empty($config['cache']['lifetime'])
+        ) {
+            if (self::$Zend_Cache->test($config['cache']['id'])) {
+                self::$Zend_Log->log('Acl Chargé dans le Cache', Zend_Log::INFO);
+                return self::$Zend_Cache->load($config['cache']['id']);
+            } else {
+                self::$Zend_Log->log('Acl Généré et save dans le Cache', Zend_Log::INFO);
+                $acl = self::InitialisationAcl($config);
+                self::$Zend_Cache->save(serialize($acl), $config['cache']['id']);
                 return $acl;
             }
         } else {
-            Zend_Registry::set('Acl', FALSE);
-            Zend_Registry::get('Log')->log('Bootstrap : _initAcl : Acl Désactivé', Zend_Log::DEBUG);
-            return FALSE;
+            throw new Spesx_Acl_Exception('Paramètre de Configuration du Cache Acl Incorrecte');
+            return self::ReturnEmptyAcl();
         }
-
-//nettoyage
-        unset($filter_bool);
-        unset($validate_file_exists);
-        unset($validate_file_extension);
-        $filter_bool = new Zend_Filter_Boolean('all');
-        $validate_file_exists = new Zend_Validate_File_Exists();
-        $validate_file_extension = new Zend_Validate_File_Extension('ini');
-
-        try {
-            $config = $this->getOption('acl');
-            $config_cache = $this->getOption('cache');
-        } catch (Exception $e) {
-            Zend_Registry::get('Log');
-            return FALSE;
-        }
-
-        if (isset($config['active']) && !empty($config['active'])) {
-            $config['active'] = $filter_bool->filter($config['active']);
-        } else {
-            $config['active'] = FALSE;
-        }
-
-        if (isset($config['active_assertion']) && !empty($config['active_assertion'])) {
-            $config['active_assertion'] = $filter_bool->filter($config['active_assertion']);
-        } else {
-            $config['active_assertion'] = FALSE;
-        }
-        //echo '../application/configs/' . $config['filename'];
-        //var_dump($validate_file_exists->isValid('../application/configs/' . $config['filename']));
-        //if ($config['active'] && $validate_file_exists->isValid('../application/configs/'.$config['filename']) && $validate_file_extension->isValid('../application/configs/'.$config['filename'])) {
-        if ($config['active']) {
-            if (isset($config['cache']['active']) && !empty($config['cache']['active'])) {
-                $config['cache']['active'] = $filter_bool->filter($config['cache']['active']);
-            }
-            if ((Zend_Registry::get('Cache') != FALSE)) {
-                if ($config['cache']['active']) {
-                    $cache = Zend_Registry::get('Cache');
-                    if (!($data = $cache->load($config_cache['idApplication'] . 'Acl')) && FALSE) {
-                        echo 'Acl get in cache';
-                        //var_dump($data);
-                        //$data = Zend_Serializer::unserialize($data);
-                        return $data;
-                    } else {
-                        echo 'Acl set in cache';
-                        $acl = $acl = $this->getAcl('../application/configs/' . $config['filename']);
-                        $Sadap = new Zend_Serializer_Adapter_Amf0();
-                        Zend_Serializer::setDefaultAdapter($Sadap);
-                        $data = Zend_Serializer::serialize($acl);
-
-                        var_dump($data);
-                        try {
-                            $cache->save($config_cache['idApplication'] . 'Acl', $data);
-                        } catch (Exception $e) {
-                            Zend_Registry::get('Log')->log('Bootstrap : _initAcl : Exception : Impossible de Mettre l\'Acl dans le Cache', Zend_Log::ALERT);
-                        }
-                    }
-                    return $acl;
-                } else {
-                    Zend_Registry::set('Acl', ($acl = $this->getAcl('../application/configs/' . $config['filename'])));
-                    return $acl;
-                }
-            } else {
-                Zend_Registry::set('Acl', ($acl = $this->getAcl('../application/configs/' . $config['filename'])));
-                return $acl;
-            }
-        } else {
-            Zend_Registry::set('Acl', FALSE);
-            Zend_Registry::get('Log')->log('Bootstrap : _initAcl : Acl Désactivé', Zend_Log::DEBUG);
-            return FALSE;
-        }
-
-//nettoyage
-        unset($filter_bool);
-        unset($validate_file_exists);
-        unset($validate_file_extension);
     }
 
-    private function getAcl($PathToIniAclFile = '../application/configs/acl.ini') {
+    private static function log($msg, $priority) {
+        
+    }
+
+    private static function InitialisationAcl(Array $config) {
+
+        if (
+                isset($config['active_assertion']) &&
+                isset($config['save']) && is_array($config['save']) &&
+                isset($config['save']['type']) && !empty($config['save']['type']) &&
+                (
+                ($config['save']['type'] == 'ini' && isset($config['save']['path']) && !empty($config['save']['path']))
+                )
+        ) {
+
+            if ($config['save']['type'] == 'ini') {
+
+                //stockage in ini
+                if (is_file($config['save']['path'])) {
+                    return self::IniToAcl($config['save']['path']);
+                } else {
+                    throw new Spesx_Acl_Exception('Paramètre de Configuration Incorrecte');
+                    return self::ReturnEmptyAcl();
+                }
+
+                //other stockage
+                //end
+            }
+        } else {
+            throw new Spesx_Acl_Exception('Paramètre de Configuration Incorrecte');
+            return self::ReturnEmptyAcl();
+        }
+    }
+
+    public static function ReturnEmptyAcl() {
+        self::$Zend_Acl = new Zend_Acl();
+        return self::$Zend_Acl;
+    }
+
+    private static function IniToAcl($PathToIniAclFile = '../application/configs/acl.ini') {
         $acl = new Zend_Acl();
         $validate_file_exists = new Zend_Validate_File_Exists();
         $validate_file_extension = new Zend_Validate_File_Extension('ini');
 
-        //if ($validate_file_exists->isValid($PathToIniAclFile) && $validate_file_extension->isValid($PathToIniAclFile)) {
-        if (TRUE) {
+//if ($validate_file_exists->isValid($PathToIniAclFile) && $validate_file_extension->isValid($PathToIniAclFile)) {
+        if (is_file($PathToIniAclFile)) {
             try {
                 $acl_role = new Zend_Config_Ini($PathToIniAclFile, 'roles');
                 $acl_resources = new Zend_Config_Ini($PathToIniAclFile, 'resources');
@@ -190,12 +133,9 @@ class Spesx_Acl {
                 return FALSE;
             }
 
-            $trigger_role_herit = array();
             foreach ($acl_role as $key => $value) {
                 $acl->addRole($key);
-                if (isset($value['herit']) && (count($value['herit']) > 0)) {
-                    $trigger_role_herit[] = $key;
-                }
+                
             }
 
             foreach ($acl_resources as $key => $value) {
@@ -209,17 +149,17 @@ class Spesx_Acl {
                     foreach ($value['deny'] as $roles) {
                         $acl->deny($roles, $key);
                     }
-                }
-            }
+                }            
+            }      
             return $acl;
         } else {
-            Zend_Registry::get('Log')->log('Bootstrap : getAcl : Impossible de charger le fichier .ini des acl Vérifier le fichier de configuration', Zend_Log::ALERT);
+            self::$Zend_Log->log('Bootstrap : getAcl : Impossible de charger le fichier .ini des acl Vérifier le fichier de configuration', Zend_Log::ALERT);
             return FALSE;
         }
 
 
 
-        //nettoyage
+//nettoyage
         unset($validate_file_exists);
         unset($validate_file_extension);
     }

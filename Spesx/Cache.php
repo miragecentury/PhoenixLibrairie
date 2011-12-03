@@ -32,7 +32,7 @@ class Spesx_Cache {
             if (
                     isset($config['enable']) && !empty($config['enable']) &&
                     isset($config['frontend']) && is_array($config['frontend']) &&
-                    isset($config['frontend']['debugenable']) && !empty($config['frontend']['debugenable']) &&
+                    isset($config['frontend']['debugenable']) &&
                     isset($config['frontend']['cache_id_prefix']) && !empty($config['frontend']['cache_id_prefix']) &&
                     isset($config['frontend']['lifetime']) && !empty($config['frontend']['lifetime']) &&
                     isset($config['frontend']['auto_serialize']) && !empty($config['frontend']['auto_serialize']) &&
@@ -40,9 +40,11 @@ class Spesx_Cache {
                     isset($config['backend']) && is_array($config['backend']) &&
                     isset($config['backend']['type']) && !empty($config['backend']['type']) &&
                     (
-                    $config['backend']['type'] == 'Libmemcached' && isset($config['backend']['host']) && isset($config['backend']['port'])
+                        ($config['backend']['type'] == 'Libmemcached' && isset($config['backend']['host']) && isset($config['backend']['port'])) ||
+                        ($config['backend']['type'] == 'Memcached' && isset($config['backend']['host']) && isset($config['backend']['port']))
                     )
             ) {
+                
                 $frontend_config = array();
 
                 if ($config['enable'] == TRUE) {
@@ -52,7 +54,7 @@ class Spesx_Cache {
                     } else {
                         $frontend_config['caching'] = FALSE;
                     }
-
+                    
                     $frontend_config['cache_id_prefix'] = $config['frontend']['cache_id_prefix'];
 
                     $frontend_config['lifetime'] = $config['frontend']['lifetime'];
@@ -75,7 +77,7 @@ class Spesx_Cache {
 
 
                     $backend_config = array();
-
+                    
                     if ($config['backend']['type'] == 'Libmemcached') {
                         if (self::TestIp($config['backend']['host'])) {
                             $backend_config['host'] = $config['backend']['host'];
@@ -92,12 +94,37 @@ class Spesx_Cache {
                         }
 
                         $backend = new Zend_Cache_Backend_Libmemcached($backend_config);
-                    }
-                    $frontend = new Zend_Cache_Core($frontend_config);
+                    } elseif ($config['backend']['type'] == 'Memcached') {
 
+                        if (self::TestIp($config['backend']['host'])) {
+                            $backend_config['host'] = $config['backend']['host'];
+                        } else {
+                            $Zend_Log->log('backend host incorréhent le valeur par défaut a été chargé', Zend_Log::ERR);
+                            $backend_config['host'] = '127.0.0.1';
+                        }
+
+                        if (0 <= $config['backend']['port'] && $config['backend']['port'] < 655356) {
+                            $backend_config['port'] = $config['backend']['port'];
+                        } else {
+                            $Zend_Log->log('Bakcend port incorréhent le valeur par défaut a été chargé', Zend_Log::ERR);
+                            $backend_config['port'] = 11211;
+                        }
+                                                
+                        //var_dump($backend_config);
+                        
+                        $backend = new Zend_Cache_Backend_Memcached($backend_config);
+ 
+                        
+                    }
+                    
+                    $frontend = new Zend_Cache_Core($frontend_config);
                     $cache = Zend_Cache::factory($frontend, $backend);
 
-                    if ($cache != FALSE && is_a($cache, 'Zend_Cache_Core')) {
+                    //var_dump($cache->save('test', 'test'));
+                    //var_dump($cache->load('test'));
+                    
+                    
+                    if ($cache != FALSE) {
                         self::$Zend_Cache = $cache;
                     } else {
                         $cache = self::ReturnBlackHoleCache();
@@ -106,8 +133,7 @@ class Spesx_Cache {
                     //cleaning
                     unset($frontend_config);
                     unset($backend_config);
-
-                    //echo 'Retourne valide cache <br/>';
+                    $Zend_Log->log('Cache Activé', Zend_Log::INFO);
                     return $cache;
                 } else {
                     $Zend_Log->log('Cache Désactivé', Zend_Log::INFO);
@@ -140,11 +166,19 @@ class Spesx_Cache {
      * @return Zend_Cache
      */
     public static function ReturnZendCache() {
-        if (isset(self::$Zend_Cache) && is_a(self::$Zend_Cache, 'Zend_Cache')) {
-            return self::$Zend_Cache;
-        } else {
-            return self::ReturnBlackHoleCache();
-        }
+        return self::$Zend_Cache;
+    }
+
+    public static function test($id) {
+        return self::$Zend_Cache->test($id);
+    }
+
+    public static function save($data, $id) {
+        return self::$Zend_Cache->save($data, $id);
+    }
+
+    public static function load($id) {
+        return self::$Zend_Cache->load($id);
     }
 
     /**
