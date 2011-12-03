@@ -113,6 +113,14 @@ class Spesx_Acl {
         return self::$Zend_Acl;
     }
 
+    public static function ReturnZendAcl() {
+        if (is_a(self::$Zend_Acl, 'Zend_Acl')) {
+            self::$Zend_Acl;
+        } else {
+            return self::ReturnEmptyAcl();
+        }
+    }
+
     private static function IniToAcl($PathToIniAclFile = '../application/configs/acl.ini') {
         $acl = new Zend_Acl();
         $validate_file_exists = new Zend_Validate_File_Exists();
@@ -135,7 +143,6 @@ class Spesx_Acl {
 
             foreach ($acl_role as $key => $value) {
                 $acl->addRole($key);
-                
             }
 
             foreach ($acl_resources as $key => $value) {
@@ -149,8 +156,8 @@ class Spesx_Acl {
                     foreach ($value['deny'] as $roles) {
                         $acl->deny($roles, $key);
                     }
-                }            
-            }      
+                }
+            }
             return $acl;
         } else {
             self::$Zend_Log->log('Bootstrap : getAcl : Impossible de charger le fichier .ini des acl Vérifier le fichier de configuration', Zend_Log::ALERT);
