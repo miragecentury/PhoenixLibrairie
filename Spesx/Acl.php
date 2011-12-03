@@ -55,7 +55,6 @@ class Spesx_Acl {
     }
 
     private static function GetAclByCache(Array $config) {
-        var_dump($config);
         if (
                 isset($config['cache']['id']) && !empty($config['cache']['id']) &&
                 isset($config['cache']['lifetime'])
