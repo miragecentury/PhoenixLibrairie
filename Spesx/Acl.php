@@ -55,9 +55,10 @@ class Spesx_Acl {
     }
 
     private static function GetAclByCache(Array $config) {
+        var_dump($config);
         if (
                 isset($config['cache']['id']) && !empty($config['cache']['id']) &&
-                isset($config['cache']['lifetime']) && !empty($config['cache']['lifetime'])
+                isset($config['cache']['lifetime'])
         ) {
             if (self::$Zend_Cache->test($config['cache']['id'])) {
                 self::$Zend_Log->log('Acl Chargé dans le Cache', Zend_Log::INFO);
