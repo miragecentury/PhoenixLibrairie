@@ -38,10 +38,13 @@ class Spesx_Acl {
                 self::$Zend_Log->log('Acl Activé', Zend_Log::INFO);
                 if ($config['cache']['enable'] == TRUE) {
                     self::$Zend_Log->log('Acl-Cache Activé', Zend_Log::INFO);
-                    return self::GetAclByCache($config);
+                    
+                    self::$Zend_Acl = self::GetAclByCache($config);
+                    return self::$Zend_Acl;
                 } else {
                     self::$Zend_Log->log('Acl-Cache Désactivé', Zend_Log::INFO);
-                    return self::InitialisationAcl($config);
+                    self::$Zend_Acl =  self::InitialisationAcl($config);
+                    return self::$Zend_Acl;
                 }
             } else {
                 self::$Zend_Log->log('Acl Désactivé', Zend_Log::INFO);
@@ -114,11 +117,7 @@ class Spesx_Acl {
     }
 
     public static function ReturnZendAcl() {
-        if (is_a(self::$Zend_Acl, 'Zend_Acl')) {
             self::$Zend_Acl;
-        } else {
-            return self::ReturnEmptyAcl();
-        }
     }
 
     private static function IniToAcl($PathToIniAclFile = '../application/configs/acl.ini') {
