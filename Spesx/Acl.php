@@ -61,7 +61,7 @@ class Spesx_Acl {
         ) {
             if (self::$Zend_Cache->test($config['cache']['id'])) {
                 self::$Zend_Log->log('Acl Chargé dans le Cache', Zend_Log::INFO);
-                return self::$Zend_Cache->load($config['cache']['id']);
+                return unserialize(self::$Zend_Cache->load($config['cache']['id']));
             } else {
                 self::$Zend_Log->log('Acl Généré et save dans le Cache', Zend_Log::INFO);
                 $acl = self::InitialisationAcl($config);
