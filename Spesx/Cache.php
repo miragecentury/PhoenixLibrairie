@@ -30,7 +30,7 @@ class Spesx_Cache {
         //var_dump($config);
         if (is_array($config)) {
             if (
-                    isset($config['enable']) && !empty($config['enable']) &&
+                    isset($config['enable']) &&
                     isset($config['frontend']) && is_array($config['frontend']) &&
                     isset($config['frontend']['debugenable']) &&
                     isset($config['frontend']['cache_id_prefix']) && !empty($config['frontend']['cache_id_prefix']) &&
